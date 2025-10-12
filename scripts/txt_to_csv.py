@@ -1,6 +1,9 @@
 import pandas as pd
 
 def txt_to_csv(input_txt_file):
+    raw_data_path = '../data/raw/'
+    processed_data_path = '../data/processed/'
+
     data = {
     "Meal": [],
     "Insulin_bolus": [],
@@ -29,7 +32,7 @@ def txt_to_csv(input_txt_file):
         'Vibrate_alerts': ['Time']
     }
 
-    with open('../data/raw/cmg-data.txt', 'r') as f:
+    with open(f'{raw_data_path}{input_txt_file}', 'r') as f:
         lines = f.readlines()
 
     current_section = None
@@ -77,7 +80,7 @@ def txt_to_csv(input_txt_file):
         if 'Time' in df.columns:
             df['Time'] = pd.to_datetime(df['Time'], format='%d/%m/%Y %H:%M')
 
-        df.to_csv(f'../data/processed/{section_name}.csv', index=False)
+        df.to_csv(f'{processed_data_path}{section_name}.csv', index=False)
 
 
 txt_to_csv('cmg-data.txt')
