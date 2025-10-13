@@ -81,6 +81,10 @@ def txt_to_csv(input_txt_file):
         if 'Time' in df.columns:
             df['Time'] = pd.to_datetime(df['Time'], format='%d/%m/%Y %H:%M')
 
+        if 'Rate' in df.columns:
+            df['Time_diff'] = df['Time'].diff().dt.total_seconds() / 3600  # różnica w godzinach
+            df['Time_diff'] = df['Time_diff'].fillna(0)
+            df['Units'] = df['Rate'].astype(float) * df['Time_diff']
         df.to_csv(f'{processed_data_path}{section_name}.csv', index=False)
 
 
