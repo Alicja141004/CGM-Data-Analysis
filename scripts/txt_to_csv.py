@@ -76,6 +76,7 @@ def txt_to_csv(input_txt_file):
 
         if 'Conc' in df.columns:
             df['Conc'] = df['Conc'].str.replace(r'[^0-9.]', '', regex=True).astype(float)
+            df['Conc'] = df['Conc'] * 18
 
         if 'Time' in df.columns:
             df['Time'] = pd.to_datetime(df['Time'], format='%d/%m/%Y %H:%M')
