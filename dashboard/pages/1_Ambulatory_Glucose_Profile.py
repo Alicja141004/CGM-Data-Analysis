@@ -24,7 +24,7 @@ st.subheader("Daily Glucose Profile")
 g_f['hour'] = g_f['Time'].dt.hour
 g_f_mean = g_f.groupby('hour').mean().reset_index()
 g_f['weekday_name'] = g_f['Time'].dt.day_name()
-# Ustaw kolejność dni tygodnia
+
 days_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 g_f['weekday_name'] = pd.Categorical(g_f['Time'].dt.day_name(), categories=days_order, ordered=True)
 
@@ -49,7 +49,6 @@ fig.add_scatter(x=percentiles.index, y=percentiles["p25"], mode="lines", fill="t
 fig.add_scatter(x=percentiles.index, y=percentiles["median"], mode="lines", name="Median", line=dict(width=3, color="#35B4FE"))
 
 fig.update_layout(
-    title="Daily Glucose Profile (AGP)",
     xaxis_title="Hour of Day",
     yaxis_title="Glucose (mg/dL)",
     hovermode="x unified",
