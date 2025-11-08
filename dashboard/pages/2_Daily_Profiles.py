@@ -14,6 +14,7 @@ st.divider()
 dfs = load_all()
 g = dfs.get("glucose", pd.DataFrame())
 infusion = dfs.get("infusion", pd.DataFrame())
+meal = dfs.get("meal", pd.DataFrame())
 
 if not g.empty and "Time" in g.columns and not pd.api.types.is_datetime64_any_dtype(g["Time"]):
     g["Time"] = pd.to_datetime(g["Time"], errors="coerce")
@@ -29,7 +30,7 @@ with st.sidebar:
         max_date = g["Time"].max().date()
 
         st.session_state.setdefault("dad_date", min_date)
-    
+
         if st.session_state["dad_date"] < min_date:
             st.session_state["dad_date"] = min_date
         if st.session_state["dad_date"] > max_date:
@@ -41,7 +42,7 @@ with st.sidebar:
         def go_next():
             st.session_state["dad_date"] = min(max_date, st.session_state["dad_date"] + timedelta(days=1))
 
-        col_prev, col_date, col_next = st.columns([1,4,1])
+        col_prev, col_date, col_next = st.columns([1, 4, 1])
         with col_prev:
             st.button("← Prev", key="prev_day", on_click=go_prev)
         with col_date:
@@ -98,7 +99,7 @@ else:
     fig = px.pie(
         data, values='value', names='category', title='Time in Range',
         color='category',
-        color_discrete_map={'hypoglycemia':'red', 'hyperglycemia':'#F59127', 'normoglycemia':'#53C257'}
+        color_discrete_map={'hypoglycemia': 'red', 'hyperglycemia': '#F59127', 'normoglycemia': '#53C257'}
     )
     fig.update_layout(width=300, height=300)
 
@@ -137,6 +138,12 @@ else:
     infusion_day = infusion_day.dropna(subset=["Time"])
 
     infusion_day = infusion_day.loc[infusion_day["Time"].dt.date == selected_day]
+
+    meal_day = meal.copy()
+    if not meal_day.empty and "Time" in meal_day.columns and not pd.api.types.is_datetime64_any_dtype(meal_day["Time"]):
+        meal_day["Time"] = pd.to_datetime(meal_day["Time"], errors="coerce")
+    meal_day = meal_day.dropna(subset=["Time"])
+    meal_day = meal_day.loc[meal_day["Time"].dt.date == selected_day]
 
     st.subheader("Daily Glucose & Insulin Profile")
     if infusion_day.empty:
@@ -177,9 +184,25 @@ else:
             xaxis=dict(type="date"),
             yaxis_title="Glucose (mg/dL)",
             bargap=0,
-            title=f"Infusion ({col_to_plot}) — {selected_day.isoformat()}"
         )
 
-        fig_bar.update_yaxes(title_text='Units (U/h)', secondary_y=True, range=[0, 1.4], showgrid=False)
+        fig_bar.update_yaxes(title_text='Units (U/h)', secondary_y=True, range=[0, 3], showgrid=False)
+
+        y_base = df_today['Conc'].max()
+        offset_step = 15
+        meal_day = meal_day.sort_values("Time").reset_index(drop=True)
+        label_y = y_base + offset_step
+        for row in meal_day.itertuples():
+            time_val = row.Time
+            cho = getattr(row, "CHO", None)
+            fig_bar.add_vline(x=time_val, line_width=2, line_dash="dash", line_color="orange")
+            fig_bar.add_annotation(
+                x=time_val,
+                y=label_y,
+                yref="y",
+                text=f"{cho} g" if cho is not None else "meal",
+                showarrow=False,
+                yanchor="bottom"
+            )
 
         st.plotly_chart(fig_bar, use_container_width=True)
