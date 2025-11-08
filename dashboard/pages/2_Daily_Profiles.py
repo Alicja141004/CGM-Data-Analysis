@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import timedelta
 from utils.load import load_all
 import numpy as np
+from plotly.subplots import make_subplots
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -141,39 +142,44 @@ else:
     if infusion_day.empty:
         st.info("No infusion data for the selected day.")
     else:
-        for preferred in ("Units", "Rate", "Value"):
-            if preferred in infusion_day.columns:
-                col_to_plot = preferred
-                break
-        else:
-            numeric_cols = infusion_day.select_dtypes(include="number").columns.tolist()
-            col_to_plot = numeric_cols[0] if numeric_cols else None
+        col_to_plot = "Units"
+        infusion_day = infusion_day.sort_values("Time").reset_index(drop=True)
 
-        if col_to_plot is None:
-            st.info("No numeric infusion column (Units/Rate/Value) found to plot.")
-        else:
-            infusion_day = infusion_day.sort_values("Time").reset_index(drop=True)
+        td = infusion_day["Time"].shift(-1) - infusion_day["Time"]
+        td = td.fillna(pd.Timedelta(minutes=5))
+        widths = td.dt.total_seconds() * 1000
 
-            td = infusion_day["Time"].shift(-1) - infusion_day["Time"]
-            td = td.fillna(pd.Timedelta(minutes=5))
-            widths = td.dt.total_seconds() * 1000
+        glucose_x = df_today.index
+        glucose_y = df_today["Conc"]
 
-            fig_bar = go.Figure()
-            fig_bar.add_trace(go.Bar(
-                x=infusion_day["Time"],
-                y=infusion_day[col_to_plot].astype(float),
-                width=widths,
-                marker_color="rgba(100,100,200,0.6)",
-                hovertemplate="%{x}<br>" + col_to_plot + ": %{y}<br>duration: %{customdata}",
-                customdata=td.astype(str),
-                name="Infusion"
-            ))
+        fig_bar = make_subplots(specs=[[{"secondary_y": True}]])
 
-            fig_bar.update_layout(
-                xaxis=dict(type="date"),
-                yaxis_title=col_to_plot,
-                bargap=0,
-                title=f"Infusion ({col_to_plot}) — {selected_day.isoformat()}"
-            )
+        fig_bar.add_trace(go.Bar(
+            x=infusion_day["Time"],
+            y=infusion_day[col_to_plot].astype(float),
+            width=widths,
+            marker_color="rgba(100,100,200,0.6)",
+            hovertemplate="%{x}<br>" + col_to_plot + ": %{y}<br>duration: %{customdata}",
+            customdata=td.astype(str),
+            name="Infusion"
+        ), secondary_y=True)
 
-            st.plotly_chart(fig_bar, use_container_width=True)
+        fig_bar.add_trace(go.Scatter(
+            x=df_today.index,
+            y=df_today['Conc'],
+            mode="lines",
+            name="Glucose",
+            line=dict(color="#1f77b4", width=2),
+            marker=dict(size=6)
+        ), secondary_y=False)
+
+        fig_bar.update_layout(
+            xaxis=dict(type="date"),
+            yaxis_title="Glucose (mg/dL)",
+            bargap=0,
+            title=f"Infusion ({col_to_plot}) — {selected_day.isoformat()}"
+        )
+
+        fig_bar.update_yaxes(title_text='Units (U/h)', secondary_y=True, range=[0, 1.4], showgrid=False)
+
+        st.plotly_chart(fig_bar, use_container_width=True)
