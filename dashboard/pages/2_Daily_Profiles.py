@@ -4,6 +4,7 @@ from datetime import timedelta
 from utils.load import load_all
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 st.title("Daily Profiles")
@@ -11,6 +12,7 @@ st.divider()
 
 dfs = load_all()
 g = dfs.get("glucose", pd.DataFrame())
+infusion = dfs.get("infusion", pd.DataFrame())
 
 if not g.empty and "Time" in g.columns and not pd.api.types.is_datetime64_any_dtype(g["Time"]):
     g["Time"] = pd.to_datetime(g["Time"], errors="coerce")
@@ -124,5 +126,54 @@ else:
             delta_color="inverse"
         )
 
-st.divider()
-st.subheader("Daily Glucose & Insulin Profile")
+    st.divider()
+    df_today = g.loc[mask_today].copy()
+    df_today = df_today.set_index("Time").sort_index()
+
+    infusion_day = infusion.copy()
+    if not infusion_day.empty and "Time" in infusion_day.columns and not pd.api.types.is_datetime64_any_dtype(infusion_day["Time"]):
+        infusion_day["Time"] = pd.to_datetime(infusion_day["Time"], errors="coerce")
+    infusion_day = infusion_day.dropna(subset=["Time"])
+
+    infusion_day = infusion_day.loc[infusion_day["Time"].dt.date == selected_day]
+
+    st.subheader("Daily Glucose & Insulin Profile")
+    if infusion_day.empty:
+        st.info("No infusion data for the selected day.")
+    else:
+        for preferred in ("Units", "Rate", "Value"):
+            if preferred in infusion_day.columns:
+                col_to_plot = preferred
+                break
+        else:
+            numeric_cols = infusion_day.select_dtypes(include="number").columns.tolist()
+            col_to_plot = numeric_cols[0] if numeric_cols else None
+
+        if col_to_plot is None:
+            st.info("No numeric infusion column (Units/Rate/Value) found to plot.")
+        else:
+            infusion_day = infusion_day.sort_values("Time").reset_index(drop=True)
+
+            td = infusion_day["Time"].shift(-1) - infusion_day["Time"]
+            td = td.fillna(pd.Timedelta(minutes=5))
+            widths = td.dt.total_seconds() * 1000
+
+            fig_bar = go.Figure()
+            fig_bar.add_trace(go.Bar(
+                x=infusion_day["Time"],
+                y=infusion_day[col_to_plot].astype(float),
+                width=widths,
+                marker_color="rgba(100,100,200,0.6)",
+                hovertemplate="%{x}<br>" + col_to_plot + ": %{y}<br>duration: %{customdata}",
+                customdata=td.astype(str),
+                name="Infusion"
+            ))
+
+            fig_bar.update_layout(
+                xaxis=dict(type="date"),
+                yaxis_title=col_to_plot,
+                bargap=0,
+                title=f"Infusion ({col_to_plot}) — {selected_day.isoformat()}"
+            )
+
+            st.plotly_chart(fig_bar, use_container_width=True)
