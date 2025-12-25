@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 import datetime as dt
 
+# ensure session state has an initial value before widget creation
+st.session_state.setdefault('dad_date', dt.date.today())
+
+# create the date widget without passing an explicit default value
+dad_date = st.date_input("Dad date", key='dad_date')
+
 def init_global_filters(glucose_df: pd.DataFrame):
     if "filters" not in st.session_state:
         st.session_state.filters = {}
