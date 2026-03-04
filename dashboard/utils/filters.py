@@ -35,7 +35,7 @@ def time_in_range(t: dt.time, start: dt.time, end: dt.time) -> bool:
 def sidebar_filters(glucose_df: pd.DataFrame, key_prefix: str = "main") -> dict:
     f = st.session_state.filters
 
-    day_labels = ["Pn","Wt","Śr","Cz","Pt","So","Nd"]
+    day_labels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
     idx_to_label = {i: day_labels[i] for i in range(7)}
     label_to_idx = {v: k for k, v in idx_to_label.items()}
     default_labels = [idx_to_label[i] for i in f["weekdays"] if i in idx_to_label]
@@ -48,19 +48,19 @@ def sidebar_filters(glucose_df: pd.DataFrame, key_prefix: str = "main") -> dict:
         max_date = f["date_to"]
 
     with st.sidebar:
-        st.header("Zakres danych")
+        st.header("Date range")
 
         c1, c2, c3, c4 = st.columns(4)
-        if c1.button("24h", key=f"{key_prefix}_btn_24h"):
+        if c1.button("24 h", key=f"{key_prefix}_btn_24h"):
             f["date_from"], f["date_to"] = max_date - dt.timedelta(days=1), max_date
             st.rerun()
-        if c2.button("7 dni", key=f"{key_prefix}_btn_7d"):
+        if c2.button("7 days", key=f"{key_prefix}_btn_7d"):
             f["date_from"], f["date_to"] = max_date - dt.timedelta(days=6), max_date
             st.rerun()
-        if c3.button("14 dni", key=f"{key_prefix}_btn_14d"):
+        if c3.button("14 days", key=f"{key_prefix}_btn_14d"):
             f["date_from"], f["date_to"] = max_date - dt.timedelta(days=13), max_date
             st.rerun()
-        if c4.button("30 dni", key=f"{key_prefix}_btn_30d"):
+        if c4.button("30 days", key=f"{key_prefix}_btn_30d"):
             f["date_from"], f["date_to"] = max_date - dt.timedelta(days=29), max_date
             st.rerun()
 
@@ -70,18 +70,18 @@ def sidebar_filters(glucose_df: pd.DataFrame, key_prefix: str = "main") -> dict:
         all_days = sorted(g_f["Date"].unique())
         default_day = all_days[0] if all_days else None
 
-        show_many = st.toggle("Pokaż wiele dni", value=False)
+        show_many = st.toggle("Show multiple days", value=False)
 
         if not show_many:
-            day = st.selectbox("Dzień", all_days, index=0 if default_day else 0)
+            day = st.selectbox("Day", all_days, index=0 if default_day else 0)
             df_plot = g_f[g_f["Date"] == day]
         else:
-            days = st.multiselect("Dni", all_days, default=all_days[:7] if len(all_days) >= 7 else all_days)
+            days = st.multiselect("Days", all_days, default=all_days[:7] if len(all_days) >= 7 else all_days)
             df_plot = g_f[g_f["Date"].isin(days)]
             
-        st.subheader("Zakres godzin")
+        st.subheader("Time range")
         night_only = st.toggle(
-            "Tylko noc (00–06)",
+            "Night only (00–06)",
             value=f["night_only"],
             key=f"{key_prefix}_night",
         )
@@ -89,10 +89,10 @@ def sidebar_filters(glucose_df: pd.DataFrame, key_prefix: str = "main") -> dict:
 
         if night_only:
             hour_from, hour_to = dt.time(0, 0), dt.time(6, 0)
-            st.info("Aktywny tryb nocny: 00:00–06:00")
+            st.info("Active night mode: 00:00–06:00")
         else:
             hour_from, hour_to = st.slider(
-                "Godziny",
+                "Hours",
                 min_value=dt.time(0, 0), max_value=dt.time(23, 59),
                 value=(f["hour_from"], f["hour_to"]),
                 step=dt.timedelta(minutes=5),
@@ -100,9 +100,9 @@ def sidebar_filters(glucose_df: pd.DataFrame, key_prefix: str = "main") -> dict:
             )
         f["hour_from"], f["hour_to"] = hour_from, hour_to
 
-        st.subheader("Dni tygodnia")
+        st.subheader("Weekdays")
         selected_labels = st.multiselect(
-            "Wybierz dni",
+            "Select days",
             options=day_labels,
             default=default_labels,
             key=f"{key_prefix}_weekdays",

@@ -100,8 +100,8 @@ st.subheader("Daily Glucose Trends")
 y_scale = alt.Scale(domain=[40, 350])
 
 base = alt.Chart(df_plot).encode(
-    x=alt.X('Time:T', axis=alt.Axis(title='Czas')),
-    y=alt.Y('Conc:Q', scale=y_scale, axis=alt.Axis(title='Stężenie glukozy [mg/dL]'))
+    x=alt.X('Time:T', axis=alt.Axis(title='Time')),
+    y=alt.Y('Conc:Q', scale=y_scale, axis=alt.Axis(title='Glucose (mg/dL)'))
 )
 
 line = base.mark_line(color='blue')
