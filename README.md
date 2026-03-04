@@ -48,7 +48,18 @@ The project focuses on evaluating glycemic control, identifying high-risk glucos
 - The majority of measurements fall within the target range, though hyperglycemic episodes occur more frequently than hypoglycemic events.
 
 ---
+## Dashboard Preview
 
+### Overview
+![Overview](screenshots/dashboard_overview.png)
+
+### Ambulatory Glucose Profile
+![AGP](screenshots/agp_profile.png)
+
+### Daily Profile
+![Daily](screenshots/daily_profile.png)
+
+---
 ## Dashboard Access
 
 - 📁 Streamlit app: `/dashboard/Dashboard_Overview.py`
