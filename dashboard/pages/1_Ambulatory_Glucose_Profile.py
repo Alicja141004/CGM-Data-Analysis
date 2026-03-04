@@ -131,7 +131,7 @@ c5.metric("Evening TAR %", f"{evening_tar_pct:.1f}%")
 st.divider()
 st.subheader("Median Glucose by Hour and Day")
 
-col1, col2, col3 = st.columns([1, 2, 1])
+col1, col2, col3 = st.columns([1, 1, 1])
 
 with col2:
     fig, ax = plt.subplots(figsize=(6, 6))
