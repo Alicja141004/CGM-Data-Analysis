@@ -2,11 +2,6 @@ import streamlit as st
 import pandas as pd
 import datetime as dt
 
-# ensure session state has an initial value before widget creation
-st.session_state.setdefault('dad_date', dt.date.today())
-
-# create the date widget without passing an explicit default value
-dad_date = st.date_input("Dad date", key='dad_date')
 
 def init_global_filters(glucose_df: pd.DataFrame):
     if "filters" not in st.session_state:
@@ -69,15 +64,23 @@ def sidebar_filters(glucose_df: pd.DataFrame, key_prefix: str = "main") -> dict:
             f["date_from"], f["date_to"] = max_date - dt.timedelta(days=29), max_date
             st.rerun()
 
-        date_from, date_to = st.date_input(
-            "Zakres dat",
-            value=(f["date_from"], f["date_to"]),
-            key=f"{key_prefix}_date_range",
-        )
-        f["date_from"], f["date_to"] = date_from, date_to
+        # --- WYBÓR DNIA / DNI (po filtrach) ---
+        g_f = glucose_df.sort_values("Time").copy()
+        g_f["Date"] = g_f["Time"].dt.date
+        all_days = sorted(g_f["Date"].unique())
+        default_day = all_days[0] if all_days else None
 
+        show_many = st.toggle("Pokaż wiele dni", value=False)
+
+        if not show_many:
+            day = st.selectbox("Dzień", all_days, index=0 if default_day else 0)
+            df_plot = g_f[g_f["Date"] == day]
+        else:
+            days = st.multiselect("Dni", all_days, default=all_days[:7] if len(all_days) >= 7 else all_days)
+            df_plot = g_f[g_f["Date"].isin(days)]
+            
         st.subheader("Zakres godzin")
-        night_only = st.checkbox(
+        night_only = st.toggle(
             "Tylko noc (00–06)",
             value=f["night_only"],
             key=f"{key_prefix}_night",
@@ -106,7 +109,7 @@ def sidebar_filters(glucose_df: pd.DataFrame, key_prefix: str = "main") -> dict:
         )
         f["weekdays"] = [label_to_idx[l] for l in selected_labels]
 
-    return f
+    return f, df_plot
 
 def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
     if df is None or df.empty or "Time" not in df.columns:

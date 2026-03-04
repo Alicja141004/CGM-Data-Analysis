@@ -12,9 +12,8 @@ st.title("CGM Dashboard")
 
 g = load_glucose()
 init_global_filters(g)
-filters = sidebar_filters(g, key_prefix='main')
+filters, df_plot = sidebar_filters(g, key_prefix='main')
 g_f = apply_filters(g, filters)
-
 st.divider()
 
 # Metric data
@@ -96,7 +95,28 @@ with c6:
         )
 st.divider()
 
-# line chart
 st.subheader("Daily Glucose Trends")
-st.line_chart(g_f.set_index("Time")["Conc"])
 
+y_scale = alt.Scale(domain=[40, 350])
+
+base = alt.Chart(df_plot).encode(
+    x=alt.X('Time:T', axis=alt.Axis(title='Czas')),
+    y=alt.Y('Conc:Q', scale=y_scale, axis=alt.Axis(title='Stężenie glukozy [mg/dL]'))
+)
+
+line = base.mark_line(color='blue')
+
+hypo_area = alt.Chart(pd.DataFrame({"y1":[40], "y2":[70]})).mark_rect(opacity=0.10, color='red').encode(
+    y='y1:Q', y2='y2:Q'
+).properties(width='container')
+
+target_area = alt.Chart(pd.DataFrame({"y1":[70], "y2":[180]})).mark_rect(opacity=0.06, color='green').encode(
+    y='y1:Q', y2='y2:Q'
+).properties(width='container')
+
+hyper_area = alt.Chart(pd.DataFrame({"y1":[180], "y2":[350]})).mark_rect(opacity=0.08, color='orange').encode(
+    y='y1:Q', y2='y2:Q'
+).properties(width='container')
+
+
+st.altair_chart(hypo_area + target_area + hyper_area + line, use_container_width=True)
