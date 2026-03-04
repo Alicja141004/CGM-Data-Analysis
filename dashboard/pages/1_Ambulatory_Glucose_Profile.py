@@ -98,7 +98,7 @@ evening_tar_pct = (evening_tar / evening_total * 100) if evening_total > 0 else 
 
 
 st.divider()
-st.subheader("Insights")
+st.subheader("Insights & Segment Comparison")
 c1, c2, c3, c4, c5 = st.columns(5, gap="medium")
 
 st.write(

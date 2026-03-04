@@ -74,6 +74,20 @@ else:
 
     vals_today = g.loc[mask_today, 'Conc']
     vals_prev = g.loc[mask_prev, 'Conc']
+        # aggregate CHO per day (sum); use meal timestamps to build masks
+    if not meal.empty and 'Time' in meal.columns:
+        meal_times = pd.to_datetime(meal['Time'], errors='coerce')
+        meal_dates = meal_times.dt.date
+        mask_meal_today = meal_dates == selected_day
+        mask_meal_prev = meal_dates == prev_day
+    else:
+        mask_meal_today = pd.Series([False] * len(meal)) if not meal.empty else pd.Series(dtype=bool)
+        mask_meal_prev = pd.Series([False] * len(meal)) if not meal.empty else pd.Series(dtype=bool)
+
+    CHO_today_series = meal.loc[mask_meal_today, 'CHO'] if 'CHO' in meal.columns else pd.Series(dtype=float)
+    CHO_prev_series = meal.loc[mask_meal_prev, 'CHO'] if 'CHO' in meal.columns else pd.Series(dtype=float)
+    CHO_today = CHO_today_series.sum() if not CHO_today_series.empty else np.nan
+    CHO_prev = CHO_prev_series.sum() if not CHO_prev_series.empty else np.nan
 
     mean_today = vals_today.mean()
     mean_prev = vals_prev.mean()
@@ -103,7 +117,7 @@ else:
     )
     fig.update_layout(width=300, height=300)
 
-    c1, c2, c3, c4 = st.columns(4, gap="medium")
+    c1, c2, c3, c4, c5 = st.columns(5, gap="medium")
     with c1:
         st.plotly_chart(fig, use_container_width=True)
     with c2:
@@ -125,6 +139,13 @@ else:
             "CV",
             f"{CV_today:0.1f} %" if pd.notna(CV_today) else "no data",
             delta=(f"{CV_today - CV_prev:0.1f} %" if pd.notna(CV_prev) else ""),
+            delta_color="inverse"
+        )
+    with c5:
+        st.metric(
+            "CHO",
+            f"{CHO_today} g" if pd.notna(CHO_today) else "no data",
+            delta=(f"{CHO_today - CHO_prev} g" if pd.notna(CHO_prev) else ""),
             delta_color="inverse"
         )
 
@@ -187,6 +208,8 @@ else:
         )
 
         fig_bar.update_yaxes(title_text='Units (U/h)', secondary_y=True, range=[0, 3], showgrid=False)
+        fig_bar.add_hline(y=70, line_dash="dash", line_color="red")
+        fig_bar.add_hline(y=180, line_dash="dash", line_color="orange")
 
         y_base = df_today['Conc'].max()
         offset_step = 15
@@ -195,7 +218,7 @@ else:
         for row in meal_day.itertuples():
             time_val = row.Time
             cho = getattr(row, "CHO", None)
-            fig_bar.add_vline(x=time_val, line_width=2, line_dash="dash", line_color="orange")
+            fig_bar.add_vline(x=time_val, line_width=2, line_dash="dash", line_color="purple")
             fig_bar.add_annotation(
                 x=time_val,
                 y=label_y,
@@ -206,3 +229,85 @@ else:
             )
 
         st.plotly_chart(fig_bar, use_container_width=True)
+st.divider()
+# --- Post-Meal Metrics (0–2h after each meal) -----------------------------
+st.subheader("Post-Meal Metrics")
+
+if meal_day.empty or df_today.empty:
+    st.info("No meal or glucose data available for post-meal analysis.")
+else:
+    # przygotuj dane (df_today ma index Time)
+    g_today = df_today.reset_index()[["Time", "Conc"]].sort_values("Time").copy()
+    m_today = meal_day[["Time", "CHO"]].sort_values("Time").copy()
+
+    window_minutes = 120
+    baseline_lookback_minutes = 15
+    min_points_in_window = 6  # ~30 min przy próbkowaniu co 5 min (ustaw wg swoich danych)
+
+    # baseline = ostatni pomiar w 15 minut przed posiłkiem
+    baseline = pd.merge_asof(
+        m_today,
+        g_today,
+        on="Time",
+        direction="backward",
+        tolerance=pd.Timedelta(minutes=baseline_lookback_minutes),
+    ).rename(columns={"Conc": "Baseline"})
+    rows = []
+    for r in baseline.itertuples(index=False):
+        meal_time = r.Time
+        cho = r.CHO if hasattr(r, "CHO") else np.nan
+        base = r.Baseline
+
+        end_time = meal_time + pd.Timedelta(minutes=window_minutes)
+        window = g_today[(g_today["Time"] >= meal_time) & (g_today["Time"] <= end_time)]
+
+        n_points = len(window)
+
+        # jeśli brak baseline albo za mało punktów w oknie → wpisz NaN
+        if pd.isna(base) or n_points < min_points_in_window:
+            rows.append({
+                "Meal time": meal_time,
+                "CHO (g)": cho,
+                "Baseline (mg/dL)": base if pd.notna(base) else np.nan,
+                "Peak (mg/dL)": np.nan,
+                "Δ Glucose 2h (mg/dL)": np.nan,
+                "Time to peak (min)": np.nan
+            })
+            continue
+
+        peak_idx = window["Conc"].idxmax()
+        peak_val = float(window.loc[peak_idx, "Conc"])
+        peak_time = window.loc[peak_idx, "Time"]
+
+        delta = peak_val - float(base)
+        ttp = (peak_time - meal_time).total_seconds() / 60.0
+
+        rows.append({
+            "Meal time": meal_time,
+            "CHO (g)": float(cho) if pd.notna(cho) else np.nan,
+            "Baseline (mg/dL)": float(base),
+            "Peak (mg/dL)": peak_val,
+            "Δ Glucose 2h (mg/dL)": delta,
+            "Time to peak (min)": ttp
+        })
+
+    post_meal = pd.DataFrame(rows).sort_values("Meal time")
+
+    # format do dashboardu
+    post_meal["Meal time"] = post_meal["Meal time"].dt.strftime("%Y-%m-%d %H:%M")
+    num_cols = ["CHO (g)", "Baseline (mg/dL)", "Peak (mg/dL)", "Δ Glucose 2h (mg/dL)", "Time to peak (min)"]
+    post_meal[num_cols] = post_meal[num_cols].round(1)
+
+    st.dataframe(
+        post_meal[["Meal time", "CHO (g)", "Δ Glucose 2h (mg/dL)", "Time to peak (min)", "Baseline (mg/dL)", "Peak (mg/dL)"]],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # małe KPI pod tabelką (opcjonalnie, ale wygląda mega profesjonalnie)
+    valid = post_meal.dropna(subset=["Δ Glucose 2h (mg/dL)", "Time to peak (min)"])
+    if not valid.empty:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Avg 2h Δ Glucose", f"{valid['Δ Glucose 2h (mg/dL)'].mean():.1f} mg/dL")
+        c2.metric("Median Time to Peak", f"{valid['Time to peak (min)'].median():.0f} min")
+        c3.metric("% Meals with Peak > 180", f"{(valid['Peak (mg/dL)'] > 180).mean()*100:.0f}%")
